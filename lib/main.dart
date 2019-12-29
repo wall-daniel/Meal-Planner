@@ -2,32 +2,88 @@ import 'package:flutter/material.dart';
 
 void main() => runApp(MaterialApp(title: 'Meal Prep App', home: HomeScreen()));
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
+  @override
+  HomeScreenState createState() => HomeScreenState();
+}
+
+class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   final _groceryList = new List<Ingredient>();
-  final _meals = new List<Meal>();
+  final _mealList = new List<Meal>();
+  final _recipeList = new List<Recipe>();
+  TabController _tabController;
+
+  HomeScreenState() {
+    _groceryList.add(Ingredient('this', 2, true));
+    _groceryList.add(Ingredient('that', 5, true));
+    _groceryList.add(Ingredient('this', 2, false));
+    _groceryList.add(Ingredient('that', 5, true));
+    _groceryList.add(Ingredient.fromJson({'name': 't', 'number': 3, 'bought': true}));
+
+    _mealList.add(Meal('Monday', 'Breakfast', 'cereal', <Ingredient>[_groceryList[0], _groceryList[2]]));
+    _mealList.add(Meal('Monday', 'Lunch', 'food', <Ingredient>[_groceryList[3], _groceryList[2]]));
+    _mealList.add(Meal('Monday', 'Dinner', 'cereal', <Ingredient>[_groceryList[0], _groceryList[2]]));
+
+    _recipeList.add(Recipe('shwarma', <Ingredient>[_groceryList[0], _groceryList[3]], <String>['This', 'Then That']));
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    _tabController = TabController(initialIndex: 0, vsync: this, length: 3);
+    _tabController.addListener(() {
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> createMeal() async {
+    final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => MealPage(null))) as Meal;
+
+    setState(() {
+      _mealList.add(result);
+    });
+  }
+
+  Future<void> editMeal(Meal meal) async {
+    final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => MealPage(meal))) as Meal;
+
+    setState(() {
+      meal = result;
+    });
+  }
+
+  Future<void> createRecipe() async {
+    final recipe =
+        await Navigator.push(context, MaterialPageRoute(builder: (context) => EditRecipePage.create())) as Recipe;
+
+    setState(() {
+      print('created');
+      _recipeList.add(recipe);
+    });
+  }
+
+  Future<void> editRecipe(int index) async {
+    final recipe =
+        await Navigator.push(context, MaterialPageRoute(builder: (context) => EditRecipePage(_recipeList[index])))
+            as Recipe;
+
+    setState(() {
+      print('edited');
+      _recipeList[index] = recipe;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    _groceryList.add(Ingredient('this', 2, true));
-    _groceryList.add(Ingredient('that', 5, true));
-    _groceryList.add(Ingredient('this', 2, false));
-    _groceryList.add(Ingredient('that', 5, true));
-    _groceryList.add(Ingredient('this', 2, false));
-    _groceryList.add(Ingredient('that', 5, true));
-    _groceryList.add(Ingredient('this', 2, true));
-    _groceryList.add(Ingredient('that', 5, true));
-    _groceryList.add(
-        Ingredient.fromJson({'name': 'those', 'number': 3, 'bought': true}));
-
-    _meals.add(Meal('Monday', 'Breakfast', 'cereal',
-        <Ingredient>[_groceryList[0], _groceryList[2]]));
-    _meals.add(Meal('Monday', 'Lunch', 'food',
-        <Ingredient>[_groceryList[3], _groceryList[2]]));
-    _meals.add(Meal('Monday', 'Dinner', 'cereal',
-        <Ingredient>[_groceryList[0], _groceryList[2]]));
-
     return DefaultTabController(
-        length: 2,
+        length: 3,
         child: Scaffold(
           appBar: AppBar(
             title: Text('Meal Planner'),
@@ -35,19 +91,72 @@ class HomeScreen extends StatelessWidget {
               tabs: <Widget>[
                 Tab(icon: Icon(Icons.local_grocery_store)),
                 Tab(icon: Icon(Icons.calendar_today)),
+                Tab(icon: Icon(Icons.receipt)),
               ],
+              controller: _tabController,
             ),
           ),
           body: TabBarView(
             children: <Widget>[
-              groceryListTab(_groceryList),
-              calenderTab(context, _meals)
+              ListView.separated(
+                separatorBuilder: (context, index) {
+                  return Divider();
+                },
+                itemCount: _groceryList.length,
+                itemBuilder: (context, index) {
+                  final item = _groceryList[index];
+
+                  return ListTile(
+                    title: Text(item.name),
+                    subtitle: Text('Number ${item.number}'),
+                    leading: Checkbox(
+                      value: item.bought,
+                      onChanged: (val) {
+                        print(val);
+                      },
+                    ),
+                  );
+                },
+              ),
+              ListView(
+                children: <Widget>[
+                  calenderDay(context, 'Monday', null, _mealList[1], _mealList[2], editMeal),
+                  calenderDay(context, 'Tuesday', _mealList[0], _mealList[1], _mealList[2], editMeal),
+                  calenderDay(context, 'Wednesday', _mealList[0], _mealList[1], _mealList[2], editMeal),
+                  calenderDay(context, 'Thursday', _mealList[0], _mealList[1], _mealList[2], editMeal),
+                  calenderDay(context, 'Friday', _mealList[0], _mealList[1], _mealList[2], editMeal)
+                ],
+              ),
+              ListView.separated(
+                itemCount: _recipeList.length,
+                separatorBuilder: (context, index) {
+                  return Divider();
+                },
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    title: Text(_recipeList[index].name),
+                    onTap: () {
+                      editRecipe(index);
+                    },
+                  );
+                },
+              )
             ],
+            controller: _tabController,
           ),
-          floatingActionButton: FloatingActionButton(
-            child: Icon(Icons.add),
-            onPressed: () => {},
-          ),
+          floatingActionButton: _tabController.index != 1
+              ? FloatingActionButton(
+                  child: Icon(Icons.add),
+                  onPressed: () => {
+                    if (_tabController.index == 0)
+                      {
+                        // Do something with ingredients
+                      }
+                    else if (_tabController.index == 2)
+                      {createRecipe()}
+                  },
+                )
+              : null,
         ));
   }
 }
@@ -64,39 +173,21 @@ class Ingredient {
         number = json['number'],
         bought = json['bought'];
 
-  Map<String, dynamic> toJson() =>
-      {'name': name, 'number': number, 'bought': bought};
-}
-
-Widget groceryListTab(List<Ingredient> items) {
-  return ListView.separated(
-    separatorBuilder: (context, index) {
-      return Divider();
-    },
-    itemCount: items.length,
-    itemBuilder: (context, index) {
-      final item = items[index];
-
-      return ListTile(
-        title: Text(item.name),
-        subtitle: Text('Number ${item.number}'),
-        leading: Checkbox(
-          value: item.bought,
-          onChanged: (val) {
-            print(val);
-          },
-        ),
-      );
-    },
-  );
+  Map<String, dynamic> toJson() => {'name': name, 'number': number, 'bought': bought};
 }
 
 class Meal {
   String day;
   String mealtime; // e.g. breakfast, lunch, dinner, snack
   String name;
-  List<Ingredient> ingredients;
+  final List<Ingredient> ingredients;
   // final List<String> instructions;
+
+  Meal.empty()
+      : ingredients = List<Ingredient>(),
+        day = '',
+        name = '',
+        mealtime = '';
 
   Meal(this.day, this.mealtime, this.name, this.ingredients);
 
@@ -106,64 +197,43 @@ class Meal {
         name = json['name'],
         ingredients = json['ingredients'];
 
-  Map<String, dynamic> toJson() =>
-      {'day': day, 'meal': mealtime, 'name': name, 'ingredients': ingredients};
+  Map<String, dynamic> toJson() => {'day': day, 'meal': mealtime, 'name': name, 'ingredients': ingredients};
 }
 
-Widget calenderTab(BuildContext context, List<Meal> meals) {
-  return ListView(
-    children: <Widget>[
-      calenderDay(context, 'Monday', null, meals[1], meals[2]),
-      calenderDay(context, 'Tuesday', meals[0], meals[1], meals[2]),
-      calenderDay(context, 'Wednesday', meals[0], meals[1], meals[2]),
-      calenderDay(context, 'Thursday', meals[0], meals[1], meals[2]),
-      calenderDay(context, 'Friday', meals[0], meals[1], meals[2])
-    ],
-  );
-}
-
-Widget calenderDay(
-    BuildContext context, String day, Meal breakfast, Meal lunch, Meal dinner) {
+Widget calenderDay(BuildContext context, String day, Meal breakfast, Meal lunch, Meal dinner, Function editMeal) {
   return Column(
     children: <Widget>[
       Container(
         padding: EdgeInsets.all(8.0),
         alignment: Alignment.centerLeft,
         color: Colors.grey,
-        child: RichText(
-            text: TextSpan(
-                style: TextStyle(fontSize: 14.0, fontWeight: FontWeight.bold),
-                text: day)),
+        child: RichText(text: TextSpan(style: TextStyle(fontSize: 14.0, fontWeight: FontWeight.bold), text: day)),
       ),
       ListTile(
         title: Text('Breakfast: ${breakfast == null ? 'n/a' : breakfast.name}'),
-        onTap: () => _editCalenderDay(context, breakfast),
+        onTap: () => editMeal(breakfast),
       ),
       ListTile(
         title: Text('Lunch: ${lunch.name}'),
-        onTap: () => _editCalenderDay(context, lunch),
+        onTap: () => editMeal(lunch),
       ),
       ListTile(
         title: Text('Dinner ${dinner.name}'),
-        onTap: () => _editCalenderDay(context, dinner),
+        onTap: () => editMeal(dinner),
       ),
     ],
   );
-}
-
-Future<void> _editCalenderDay(BuildContext context, Meal meal) async {
-  final result = await Navigator.push(
-      context, MaterialPageRoute(builder: (context) => MealPage(meal))) as Meal;
-
-  print(result);
 }
 
 class MealPage extends StatelessWidget {
   final _formKey = GlobalKey<FormState>();
   Meal _meal;
 
-  MealPage(this._meal);
-
+  MealPage(this._meal) {
+    if (_meal == null) {
+      _meal = Meal.empty();
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -173,10 +243,7 @@ class MealPage extends StatelessWidget {
             IconButton(
               icon: Icon(Icons.save),
               onPressed: () => {
-                if (_formKey.currentState.validate()) {
-                  _formKey.currentState.save(),
-                  Navigator.pop(context, _meal)
-                }
+                if (_formKey.currentState.validate()) {_formKey.currentState.save(), Navigator.pop(context, _meal)}
               },
             )
           ],
@@ -184,31 +251,152 @@ class MealPage extends StatelessWidget {
         body: Container(
           margin: EdgeInsets.all(8.0),
           child: Form(
-            key: _formKey,
+              key: _formKey,
+              child: Column(
+                children: <Widget>[
+                  TextFormField(
+                    initialValue: _meal == null ? '' : _meal.name,
+                    decoration: InputDecoration(labelText: 'Recipe Name', icon: Icon(Icons.add_a_photo)),
+                    validator: (value) {
+                      if (value.isEmpty) {
+                        return 'Name cannot be null';
+                      } else if (value.length > 25) {
+                        return 'Name cannot be longer than 25 characters';
+                      }
+
+                      return null;
+                    },
+                    onSaved: (value) {
+                      _meal.name = value;
+                    },
+                  )
+                ],
+              )),
+        ));
+  }
+}
+
+class Recipe {
+  String name;
+  final List<Ingredient> ingredients;
+  final List<String> instructions;
+
+  Recipe(this.name, this.ingredients, this.instructions);
+
+  Recipe.fromJson(Map<String, dynamic> json)
+      : name = json['name'],
+        ingredients = json['ingredients'],
+        instructions = json['instructions'];
+
+  Map<String, dynamic> toJson() => {'name': name};
+}
+
+class EditRecipePage extends StatefulWidget {
+  Recipe _recipe;
+
+  EditRecipePage(this._recipe);
+
+  EditRecipePage.create() {
+    _recipe = Recipe('', List<Ingredient>(), List<String>());
+  }
+
+  @override
+  EditRecipeState createState() => EditRecipeState();
+}
+
+class EditRecipeState extends State<EditRecipePage> {
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+        appBar: AppBar(
+          title: Text('Recipe'),
+          actions: <Widget>[
+            IconButton(
+              icon: Icon(Icons.save),
+              onPressed: () {
+                if (_formKey.currentState.validate()) {
+                  _formKey.currentState.save();
+
+                  Navigator.pop(context, widget._recipe);
+                }
+              },
+            )
+          ],
+        ),
+        body: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
             child: Column(
               children: <Widget>[
                 TextFormField(
-                  initialValue: _meal == null ? '' : _meal.name,
-                  decoration: InputDecoration(
-                    labelText: 'Recipe Name', icon: Icon(Icons.add_a_photo)
-                  ),
+                  decoration: InputDecoration(labelText: 'Recipe Name', hintText: 'Name'),
+                  initialValue: widget._recipe.name,
                   validator: (value) {
-                    if (value.isEmpty) {
-                      return 'Name cannot be null';
-                    } else if (value.length > 25) {
-                      return 'Name cannot be longer than 25 characters';
+                    if (value.length < 3) {
+                      return 'Name has to be more than 3 characters';
                     }
 
                     return null;
                   },
                   onSaved: (value) {
-                    _meal.name = value;
+                    widget._recipe.name = value;
+                  },
+                ),
+                Container(
+                    padding: EdgeInsets.fromLTRB(8.0, 24.0, 8.0, 8.0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Ingredients:',
+                        style: TextStyle(color: Colors.black87, fontSize: 24.0),
+                      ),
+                    )),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: NeverScrollableScrollPhysics(),
+                  itemCount: widget._recipe.ingredients.length,
+                  itemBuilder: (context, index) {
+                    return Text(widget._recipe.ingredients[index].name);
+                  },
+                  separatorBuilder: (context, index) {
+                    return Divider();
+                  },
+                ),
+                Container(
+                    padding: EdgeInsets.fromLTRB(8.0, 24.0, 8.0, 8.0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Instructions:',
+                        style: TextStyle(color: Colors.black87, fontSize: 24.0),
+                      ),
+                    )),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: NeverScrollableScrollPhysics(),
+                  itemCount: widget._recipe.instructions.length,
+                  itemBuilder: (context, index) {
+                    return TextFormField(
+                      initialValue: widget._recipe.instructions[index],
+                      decoration: InputDecoration(hintText: 'Step #${index + 1}'),
+                      onChanged: (value) {
+                        if (index + 1 == widget._recipe.instructions.length) {
+                          setState(() {
+                            widget._recipe.instructions.add('');
+                          });
+                        }
+                      },
+                    );
+                  },
+                  separatorBuilder: (context, index) {
+                    return Divider();
                   },
                 )
               ],
-            )
+            ),
           ),
-        )
-      );
+        ));
   }
 }
