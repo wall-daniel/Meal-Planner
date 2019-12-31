@@ -1,4 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'dart:async';
+import 'package:path_provider/path_provider.dart';
 
 void main() => runApp(MaterialApp(title: 'Meal Prep App', home: HomeScreen()));
 
@@ -7,7 +12,7 @@ class HomeScreen extends StatefulWidget {
   HomeScreenState createState() => HomeScreenState();
 }
 
-class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final _groceryList = new List<Ingredient>();
   final _mealList = new List<Meal>();
   final _recipeList = new List<Recipe>();
@@ -23,8 +28,6 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
     _mealList.add(Meal('Monday', 'Breakfast', 'cereal', <Ingredient>[_groceryList[0], _groceryList[2]]));
     _mealList.add(Meal('Monday', 'Lunch', 'food', <Ingredient>[_groceryList[3], _groceryList[2]]));
     _mealList.add(Meal('Monday', 'Dinner', 'cereal', <Ingredient>[_groceryList[0], _groceryList[2]]));
-
-    _recipeList.add(Recipe('shwarma', <Ingredient>[_groceryList[0], _groceryList[3]], <String>['This', 'Then That']));
   }
 
   @override
@@ -35,10 +38,54 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
     _tabController.addListener(() {
       setState(() {});
     });
+
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  Future<File> get _localFile async {
+    final directory = await getApplicationDocumentsDirectory();
+    final path = directory.path;
+    return File('$path/recipes.txt');
+  }
+
+  read() async {
+    final file = await _localFile;
+    final fileOutput = await file.readAsString();
+    print(fileOutput);
+
+    try {
+      final map = json.decode(fileOutput);
+      _recipeList.addAll(map['recipes']);
+    } catch (e) {
+      print(e);
+    }
+
+    // setState(() {
+
+    // });
+  }
+
+  save() async {
+    final file = await _localFile;
+
+    final map = Map<String, dynamic>();
+    map['recipes'] = _recipeList;
+    map['meals'] = _mealList;
+
+    print(json.encode(map));
+    file.writeAsString(json.encode(map));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      save();
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
   }
@@ -74,14 +121,17 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
         await Navigator.push(context, MaterialPageRoute(builder: (context) => EditRecipePage(_recipeList[index])))
             as Recipe;
 
-    setState(() {
-      print('edited');
-      _recipeList[index] = recipe;
-    });
+    if (recipe != null) {
+      setState(() {
+        _recipeList[index] = recipe;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    read();
+
     return DefaultTabController(
         length: 3,
         child: Scaffold(
@@ -289,6 +339,11 @@ class Recipe {
         instructions = json['instructions'];
 
   Map<String, dynamic> toJson() => {'name': name};
+
+  @override
+  String toString() {
+    return jsonEncode(this.toJson());
+  }
 }
 
 class EditRecipePage extends StatefulWidget {
