@@ -126,10 +126,12 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
     final recipe =
         await Navigator.push(context, MaterialPageRoute(builder: (context) => EditRecipePage.create())) as Recipe;
 
-    setState(() {
-      print('created');
-      _recipeList.add(recipe);
-    });
+    if (recipe != null) {
+      setState(() {
+        print('created');
+        _recipeList.add(recipe);
+      });
+    }
   }
 
   Future<void> editRecipe(int index) async {
@@ -137,11 +139,11 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
         await Navigator.push(context, MaterialPageRoute(builder: (context) => EditRecipePage(_recipeList[index])))
             as Recipe;
 
-    if (recipe != null) {
-      setState(() {
-        _recipeList[index] = recipe;
-      });
-    }
+    // if (recipe != null) {
+    //   setState(() {
+    //     _recipeList[index] = recipe;
+    //   });
+    // }
   }
 
   @override
@@ -226,11 +228,17 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
 }
 
 class Ingredient {
-  final String name;
-  final int number;
-  final bool bought;
+  String name;
+  int number;
+  bool bought;
 
   Ingredient(this.name, this.number, this.bought);
+
+  Ingredient.empty() {
+    name = '';
+    number = 0;
+    bought = false;
+  }
 
   Ingredient.fromJson(Map<String, dynamic> json)
       : name = json['name'],
@@ -253,7 +261,7 @@ class Meal {
 
   Meal.fromJson(Map<String, dynamic> json)
       : name = json['name'],
-        ingredients = json['ingredients'];
+        ingredients = List.from(json['ingredients']);
 
   Map<String, dynamic> toJson() => {'name': name, 'ingredients': ingredients};
 }
@@ -274,9 +282,9 @@ class Day {
 
   Day.fromJson(Map<String, dynamic> json)
       : day = json['day'],
-        breakfast = json['breakfast'],
-        lunch = json['lunch'],
-        dinner = json['dinner'];
+        breakfast = Meal.fromJson(json['breakfast']),
+        lunch = Meal.fromJson(json['lunch']),
+        dinner = Meal.fromJson(json['dinner']);
 
   Map<String, dynamic> toJson() => {'day': day, 'breakfast': breakfast, 'lunch': lunch, 'dinner': dinner};
 }
@@ -379,11 +387,13 @@ class Recipe {
 
 class EditRecipePage extends StatefulWidget {
   Recipe _recipe;
+  bool editing = false;
 
   EditRecipePage(this._recipe);
 
   EditRecipePage.create() {
-    _recipe = Recipe('', List<Ingredient>(), List<String>());
+    _recipe = Recipe('', <Ingredient>[Ingredient.empty()], <String>['']);
+    editing = true;
   }
 
   @override
@@ -405,8 +415,22 @@ class EditRecipeState extends State<EditRecipePage> {
                 if (_formKey.currentState.validate()) {
                   _formKey.currentState.save();
 
+                  // Remove empty ingredients and instructions
+                  widget._recipe.ingredients.removeWhere((value) => value.name.isEmpty);
+                  widget._recipe.instructions.removeWhere((value) => value.isEmpty);
+
                   Navigator.pop(context, widget._recipe);
                 }
+              },
+            ),
+            IconButton(
+              icon: Icon(Icons.edit),
+              onPressed: () {
+                setState(() {
+                  widget._recipe.ingredients.add(Ingredient.empty());
+                  widget._recipe.instructions.add('');
+                  widget.editing = true;
+                });
               },
             )
           ],
@@ -429,6 +453,7 @@ class EditRecipeState extends State<EditRecipePage> {
                   onSaved: (value) {
                     widget._recipe.name = value;
                   },
+                  enabled: widget.editing,
                 ),
                 Container(
                     padding: EdgeInsets.fromLTRB(8.0, 24.0, 8.0, 8.0),
@@ -444,7 +469,20 @@ class EditRecipeState extends State<EditRecipePage> {
                   physics: NeverScrollableScrollPhysics(),
                   itemCount: widget._recipe.ingredients.length,
                   itemBuilder: (context, index) {
-                    return Text(widget._recipe.ingredients[index].name);
+                    return TextFormField(
+                      initialValue: widget._recipe.ingredients[index].name,
+                      decoration: InputDecoration(hintText: 'Ingredient #${index + 1}'),
+                      onChanged: (value) {
+                        if (index + 1 == widget._recipe.ingredients.length) {
+                          setState(() {
+                            widget._recipe.ingredients.add(Ingredient.empty());
+                          });
+                        }
+                      },
+                      onSaved: (value) {
+                        widget._recipe.ingredients[index].name = value;
+                      },
+                    );
                   },
                   separatorBuilder: (context, index) {
                     return Divider();
@@ -473,6 +511,9 @@ class EditRecipeState extends State<EditRecipePage> {
                             widget._recipe.instructions.add('');
                           });
                         }
+                      },
+                      onSaved: (value) {
+                        widget._recipe.instructions[index] = value;
                       },
                     );
                   },
