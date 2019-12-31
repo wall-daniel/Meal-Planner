@@ -107,7 +107,8 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
   }
 
   Future<void> createMeal() async {
-    final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => MealPage(null))) as Meal;
+    final result =
+        await Navigator.push(context, MaterialPageRoute(builder: (context) => MealPage(null, _recipeList))) as Meal;
 
     setState(() {
       // _meals.add(result);
@@ -115,7 +116,8 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
   }
 
   Future<void> editMeal(Meal meal) async {
-    final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => MealPage(meal))) as Meal;
+    final result =
+        await Navigator.push(context, MaterialPageRoute(builder: (context) => MealPage(meal, _recipeList))) as Meal;
 
     setState(() {
       meal = result;
@@ -317,8 +319,9 @@ Widget calenderDay(BuildContext context, Day day, Function editMeal) {
 class MealPage extends StatelessWidget {
   final _formKey = GlobalKey<FormState>();
   Meal _meal;
+  final List<Recipe> _recipeList;
 
-  MealPage(this._meal) {
+  MealPage(this._meal, this._recipeList) {
     if (_meal == null) {
       _meal = Meal.empty();
     }
@@ -343,6 +346,14 @@ class MealPage extends StatelessWidget {
               key: _formKey,
               child: Column(
                 children: <Widget>[
+                  DropdownButton<Recipe>(
+                    items: _recipeList.map<DropdownMenuItem<Recipe>>((value) {
+                      return DropdownMenuItem(child: Text(value.name));
+                    }).toList(),
+                    onChanged: (value) {
+                      print(value.toJson());
+                    },
+                  ),
                   TextFormField(
                     initialValue: _meal == null ? '' : _meal.name,
                     decoration: InputDecoration(labelText: 'Recipe Name', icon: Icon(Icons.add_a_photo)),
