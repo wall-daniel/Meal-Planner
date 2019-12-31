@@ -14,7 +14,7 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final _groceryList = new List<Ingredient>();
-  final _mealList = new List<Meal>();
+  final _meals = new List<Day>();
   final _recipeList = new List<Recipe>();
   TabController _tabController;
 
@@ -25,9 +25,7 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
     _groceryList.add(Ingredient('that', 5, true));
     _groceryList.add(Ingredient.fromJson({'name': 't', 'number': 3, 'bought': true}));
 
-    _mealList.add(Meal('Monday', 'Breakfast', 'cereal', <Ingredient>[_groceryList[0], _groceryList[2]]));
-    _mealList.add(Meal('Monday', 'Lunch', 'food', <Ingredient>[_groceryList[3], _groceryList[2]]));
-    _mealList.add(Meal('Monday', 'Dinner', 'cereal', <Ingredient>[_groceryList[0], _groceryList[2]]));
+    read();
   }
 
   @override
@@ -48,21 +46,39 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
     return File('$path/recipes.txt');
   }
 
-  read() async {
-    final file = await _localFile;
-    final fileOutput = await file.readAsString();
-    print(fileOutput);
+  createEmptyWeek() {
+    print('Creating empty week.');
 
+    _meals.add(Day.empty('Monday'));
+    _meals.add(Day.empty('Tuesday'));
+    _meals.add(Day.empty('Wednesday'));
+    _meals.add(Day.empty('Thursday'));
+    _meals.add(Day.empty('Friday'));
+
+    print(jsonEncode(_meals));
+  }
+
+  read() async {
     try {
+      final file = await _localFile;
+      final fileOutput = await file.readAsString();
+      print(fileOutput);
+
       final map = json.decode(fileOutput);
-      _recipeList.addAll(map['recipes']);
+
+      for (var i in map['recipes'] as List<dynamic>) {
+        _recipeList.add(Recipe.fromJson(i));
+      }
+      for (var i in map['meals'] as List<dynamic>) {
+        _meals.add(Day.fromJson(i));
+      }
     } catch (e) {
       print(e);
     }
 
-    // setState(() {
-
-    // });
+    if (_meals.length == 0) {
+      createEmptyWeek();
+    }
   }
 
   save() async {
@@ -70,7 +86,7 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
 
     final map = Map<String, dynamic>();
     map['recipes'] = _recipeList;
-    map['meals'] = _mealList;
+    map['meals'] = _meals;
 
     print(json.encode(map));
     file.writeAsString(json.encode(map));
@@ -94,7 +110,7 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
     final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => MealPage(null))) as Meal;
 
     setState(() {
-      _mealList.add(result);
+      // _meals.add(result);
     });
   }
 
@@ -130,8 +146,6 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
 
   @override
   Widget build(BuildContext context) {
-    read();
-
     return DefaultTabController(
         length: 3,
         child: Scaffold(
@@ -168,14 +182,14 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
                   );
                 },
               ),
-              ListView(
-                children: <Widget>[
-                  calenderDay(context, 'Monday', null, _mealList[1], _mealList[2], editMeal),
-                  calenderDay(context, 'Tuesday', _mealList[0], _mealList[1], _mealList[2], editMeal),
-                  calenderDay(context, 'Wednesday', _mealList[0], _mealList[1], _mealList[2], editMeal),
-                  calenderDay(context, 'Thursday', _mealList[0], _mealList[1], _mealList[2], editMeal),
-                  calenderDay(context, 'Friday', _mealList[0], _mealList[1], _mealList[2], editMeal)
-                ],
+              ListView.separated(
+                separatorBuilder: (context, index) {
+                  return Divider();
+                },
+                itemCount: _meals.length,
+                itemBuilder: (context, index) {
+                  return calenderDay(context, _meals[index], editMeal);
+                },
               ),
               ListView.separated(
                 itemCount: _recipeList.length,
@@ -227,49 +241,66 @@ class Ingredient {
 }
 
 class Meal {
-  String day;
-  String mealtime; // e.g. breakfast, lunch, dinner, snack
   String name;
   final List<Ingredient> ingredients;
   // final List<String> instructions;
 
   Meal.empty()
       : ingredients = List<Ingredient>(),
-        day = '',
-        name = '',
-        mealtime = '';
+        name = '';
 
-  Meal(this.day, this.mealtime, this.name, this.ingredients);
+  Meal(this.name, this.ingredients);
 
   Meal.fromJson(Map<String, dynamic> json)
-      : day = json['day'],
-        mealtime = json['meal'],
-        name = json['name'],
+      : name = json['name'],
         ingredients = json['ingredients'];
 
-  Map<String, dynamic> toJson() => {'day': day, 'meal': mealtime, 'name': name, 'ingredients': ingredients};
+  Map<String, dynamic> toJson() => {'name': name, 'ingredients': ingredients};
 }
 
-Widget calenderDay(BuildContext context, String day, Meal breakfast, Meal lunch, Meal dinner, Function editMeal) {
+class Day {
+  String day;
+  Meal breakfast;
+  Meal lunch;
+  Meal dinner;
+
+  Day(this.day, this.breakfast, this.lunch, this.dinner);
+
+  Day.empty(this.day) {
+    breakfast = Meal.empty();
+    lunch = Meal.empty();
+    dinner = Meal.empty();
+  }
+
+  Day.fromJson(Map<String, dynamic> json)
+      : day = json['day'],
+        breakfast = json['breakfast'],
+        lunch = json['lunch'],
+        dinner = json['dinner'];
+
+  Map<String, dynamic> toJson() => {'day': day, 'breakfast': breakfast, 'lunch': lunch, 'dinner': dinner};
+}
+
+Widget calenderDay(BuildContext context, Day day, Function editMeal) {
   return Column(
     children: <Widget>[
       Container(
         padding: EdgeInsets.all(8.0),
         alignment: Alignment.centerLeft,
         color: Colors.grey,
-        child: RichText(text: TextSpan(style: TextStyle(fontSize: 14.0, fontWeight: FontWeight.bold), text: day)),
+        child: RichText(text: TextSpan(style: TextStyle(fontSize: 14.0, fontWeight: FontWeight.bold), text: day.day)),
       ),
       ListTile(
-        title: Text('Breakfast: ${breakfast == null ? 'n/a' : breakfast.name}'),
-        onTap: () => editMeal(breakfast),
+        title: Text('Breakfast: ${day.breakfast == null ? 'n/a' : day.breakfast.name}'),
+        onTap: () => editMeal(day.breakfast),
       ),
       ListTile(
-        title: Text('Lunch: ${lunch.name}'),
-        onTap: () => editMeal(lunch),
+        title: Text('Lunch: ${day.lunch == null ? 'n/a' : day.lunch.name}'),
+        onTap: () => editMeal(day.lunch),
       ),
       ListTile(
-        title: Text('Dinner ${dinner.name}'),
-        onTap: () => editMeal(dinner),
+        title: Text('Dinner ${day.dinner == null ? 'n/a' : day.dinner.name}'),
+        onTap: () => editMeal(day.dinner),
       ),
     ],
   );
