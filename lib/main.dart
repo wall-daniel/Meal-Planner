@@ -103,6 +103,7 @@ class HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMi
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
+    
     super.dispose();
   }
 
